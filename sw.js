@@ -1,4 +1,4 @@
-const CACHE = 'mudget-v10';
+const CACHE = 'mudget-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -13,7 +13,12 @@ self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(cache => cache.addAll(ASSETS)).catch(()=>{})
   );
-  self.skipWaiting();
+  // don't auto skipWaiting anymore — wait for the page to tell us to,
+  // via the SKIP_WAITING message, once it's ready to reload
+});
+
+self.addEventListener('message', e => {
+  if(e.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {

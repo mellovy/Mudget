@@ -620,6 +620,35 @@ setInterval(() => { if(state) render(); }, 60000);
 // ---------- SERVICE WORKER ----------
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // if a new SW is already waiting, activate it immediately
+      if(reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
+
+      // watch for a new SW being found and force it to activate
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if(!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if(newWorker.state === 'installed' && navigator.serviceWorker.controller){
+            newWorker.postMessage('SKIP_WAITING');
+          }
+        });
+      });
+
+      // check for updates every time the app is opened/foregrounded
+      reg.update();
+      document.addEventListener('visibilitychange', () => {
+        if(document.visibilityState === 'visible') reg.update();
+      });
+    }).catch(()=>{});
+
+    // reload the page once the new SW takes control, so the fresh
+    // assets actually get used instead of sitting cached-but-unused
+    let refreshed = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if(refreshed) return;
+      refreshed = true;
+      window.location.reload();
+    });
   });
 }
