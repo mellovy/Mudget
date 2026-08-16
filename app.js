@@ -540,6 +540,11 @@ document.getElementById('open-settings').addEventListener('click', openSettings)
 document.getElementById('settings-backdrop').addEventListener('click', closeSettings);
 document.getElementById('settings-close').addEventListener('click', closeSettings);
 
+document.getElementById('auto-save-target').addEventListener('click', () => {
+  const amount = parseFloat(document.getElementById('set-amount').value) || state.config.amount;
+  document.getElementById('set-save').value = Math.round(amount * 0.2);
+});
+
 document.getElementById('add-envelope-row').addEventListener('click', () => {
   const nextColor = ENV_COLORS[state.config.envelopes.length % ENV_COLORS.length];
   state.config.envelopes.push({ name:'New', amount:0, color: nextColor });

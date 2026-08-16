@@ -246,14 +246,17 @@ h1{
 .settings-footer .btn-ghost{ margin-top:8px; }
 
 .appearance-row{
-  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  display:flex; align-items:center; gap:10px;
+  flex-wrap:nowrap;
+  overflow-x:auto;
 }
 .appearance-divider{
-  width:1px; align-self:stretch; min-height:44px;
+  width:1px; align-self:stretch; min-height:38px;
   background:var(--line);
+  flex:0 0 auto;
 }
 .appearance-row .theme-icon-toggle{ margin-bottom:0; flex:0 0 auto; }
-.appearance-row .accent-picker{ margin-bottom:0; flex:1; }
+.appearance-row .accent-picker{ margin-bottom:0; flex:0 0 auto; }
 
 .btn-danger.severe{
   background:rgba(255,93,93,0.12);
@@ -396,30 +399,40 @@ h1{
 .quick-chip:active{ background:var(--accent-glow); color:var(--accent); border-color:var(--accent-dim); }
 
 /* ---------- ACCENT PICKER ---------- */
-.accent-picker{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+.accent-picker{ display:flex; gap:8px; flex-wrap:nowrap; margin-bottom:12px; }
 .accent-swatch{
-  width:34px; height:34px; border-radius:50%;
+  width:28px; height:28px; border-radius:50%;
   cursor:pointer;
   border:2px solid transparent;
+  flex:0 0 auto;
 }
 .accent-swatch.selected{ border-color:var(--text); }
 
 /* ---------- THEME ICON TOGGLE ---------- */
 .theme-icon-toggle{ display:flex; gap:8px; margin-bottom:14px; }
 .theme-icon-btn{
-  width:44px; height:44px;
+  width:38px; height:38px;
   display:flex; align-items:center; justify-content:center;
   border-radius:10px;
   border:1px solid var(--line);
   background:var(--bg-elev-2);
   color:var(--text-dim);
   cursor:pointer;
+  flex:0 0 auto;
 }
 .theme-icon-btn svg{ width:18px; height:18px; }
 .theme-icon-btn.selected{
   background:var(--accent-glow);
   border-color:var(--accent-dim);
   color:var(--accent);
+}
+
+.auto-save-btn{
+  width:auto; flex:0 0 auto;
+  margin-top:0;
+  padding:0 14px;
+  white-space:nowrap;
+  font-size:11px;
 }
 
 .env-edit-row input.env-color{
