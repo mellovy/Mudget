@@ -203,8 +203,20 @@
       </div>
 
       <div class="field-group">
+        <label>Theme</label>
+        <div class="theme-toggle">
+          <button class="theme-btn" id="theme-dark" data-theme="dark">DARK</button>
+          <button class="theme-btn" id="theme-light" data-theme="light">LIGHT</button>
+        </div>
+      </div>
+
+      <div class="field-group">
         <label>Accent color</label>
         <div class="accent-picker" id="accent-picker"></div>
+        <div class="custom-color-row">
+          <input type="color" id="custom-accent" value="#e8918f">
+          <span>custom</span>
+        </div>
       </div>
 
       <button class="btn-primary" id="settings-save">SAVE CHANGES</button>

@@ -25,8 +25,8 @@ function peso(n){
 }
 function dayMs(){ return 24*60*60*1000; }
 
-const ACCENTS = ['#b4ff39','#39d6ff','#ff8fd6','#ffb84d','#8f7bff','#ff6b6b'];
-const ENV_COLORS = ['#b4ff39','#39d6ff','#ff8fd6','#ffb84d','#8f7bff','#ff6b6b','#6fe3a0','#f4f1ea'];
+const ACCENTS = ['#e8918f','#f2b6b0','#f4c9a8','#c9d9a8','#a8c9d4','#c3aed6'];
+const ENV_COLORS = ['#e8918f','#f2b6b0','#f4c9a8','#c9d9a8','#a8c9d4','#c3aed6','#e0c3e0','#f4f1ea'];
 
 function defaultEnvelopes(amount, save){
   const spendable = Math.max(amount - save, 0);
@@ -44,6 +44,10 @@ function applyAccent(hex){
   document.documentElement.style.setProperty('--accent-glow', hex + '30');
 }
 
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : '');
+}
+
 // ---------- ONBOARDING ----------
 document.getElementById('ob-continue').addEventListener('click', () => {
   const amount = parseFloat(document.getElementById('ob-amount').value) || 1000;
@@ -58,7 +62,7 @@ document.getElementById('ob-continue').addEventListener('click', () => {
     },
     cycleStart: Date.now(),
     logs: [],
-    lifetimeSaved: 0,
+    lifetimeSaved: save,
     history: []
   };
   saveState(state);
@@ -74,18 +78,20 @@ function checkRollover(){
 
   while(elapsed >= cycleMs){
     const spent = state.logs.reduce((s,l)=>s+l.amount,0);
-    const leftover = state.config.amount - spent;
+    const spendable = state.config.amount - state.config.save;
+    const leftover = spendable - spent; // extra unspent beyond the save target, can be negative
     state.lifetimeSaved += leftover;
     state.history.unshift({
       start: state.cycleStart,
       spent,
-      leftover,
+      leftover: leftover + state.config.save, // total banked this cycle (save + extra)
       logs: state.logs
     });
     if(state.history.length > 30) state.history.pop();
 
     state.cycleStart += cycleMs;
     state.logs = [];
+    state.lifetimeSaved += state.config.save; // new cycle's save target, banked immediately
     saveState(state);
     return checkRollover(); // in case multiple cycles passed while app was closed
   }
@@ -110,9 +116,10 @@ function render(){
     daysLeft >= 1 ? `${daysLeft} DAY${daysLeft===1?'':'S'} LEFT` : `${hoursLeft}H LEFT`;
 
   const spent = currentSpentTotal();
-  const remaining = config.amount - spent;
+  const spendable = config.amount - config.save;
+  const remaining = spendable - spent;
   const pctElapsed = Math.min(1, elapsed/cycleMs);
-  const pctSpent = Math.min(1, spent/config.amount);
+  const pctSpent = Math.min(1, spent/spendable);
 
   document.getElementById('spent-total').textContent = peso(spent);
   document.getElementById('remaining-total').textContent = peso(remaining);
@@ -470,10 +477,32 @@ function renderAccentPicker(){
       state.config.accent = hex;
       applyAccent(hex);
       renderAccentPicker();
+      saveState(state);
     });
     wrap.appendChild(sw);
   });
+  document.getElementById('custom-accent').value = state.config.accent;
+
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.theme === (state.config.theme || 'dark'));
+  });
 }
+
+document.getElementById('custom-accent').addEventListener('input', (e) => {
+  state.config.accent = e.target.value;
+  applyAccent(e.target.value);
+  renderAccentPicker();
+  saveState(state);
+});
+
+document.querySelectorAll('.theme-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.config.theme = btn.dataset.theme;
+    applyTheme(state.config.theme);
+    renderAccentPicker();
+    saveState(state);
+  });
+});
 function closeSettings(){ settingsSheet.classList.add('hidden'); }
 
 function renderEnvelopeEditList(){
@@ -524,13 +553,15 @@ document.getElementById('settings-save').addEventListener('click', () => {
 });
 
 document.getElementById('settings-reset').addEventListener('click', () => {
-  if(!confirm('End this cycle now and start fresh? Leftover will be added to your saved total.')) return;
+  if(!confirm('End this cycle now and start fresh? Your save target is already counted as saved — any extra unspent money will be banked too.')) return;
   const spent = currentSpentTotal();
-  const leftover = state.config.amount - spent;
+  const spendable = state.config.amount - state.config.save;
+  const leftover = spendable - spent;
   state.lifetimeSaved += leftover;
-  state.history.unshift({ start: state.cycleStart, spent, leftover, logs: state.logs });
+  state.history.unshift({ start: state.cycleStart, spent, leftover: leftover + state.config.save, logs: state.logs });
   state.cycleStart = Date.now();
   state.logs = [];
+  state.lifetimeSaved += state.config.save;
   saveState(state);
   closeSettings();
   render();
@@ -544,11 +575,17 @@ function boot(){
     return;
   }
   checkRollover();
-  if(!state.config.accent) state.config.accent = ACCENTS[0];
+  if(!state.migratedSaveV2){
+    state.lifetimeSaved += state.config.save; // bank this cycle's save target under the new logic
+    state.migratedSaveV2 = true;
+    saveState(state);
+  }
+  if(!state.config.accent || state.config.accent === '#b4ff39') state.config.accent = ACCENTS[0];
   if(state.config.envelopes.some(e=>!e.color)){
     state.config.envelopes.forEach((e,i)=>{ if(!e.color) e.color = ENV_COLORS[i % ENV_COLORS.length]; });
   }
   applyAccent(state.config.accent);
+  applyTheme(state.config.theme || 'dark');
   onboardingEl.classList.add('hidden');
   mainEl.classList.remove('hidden');
   render();
