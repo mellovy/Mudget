@@ -129,6 +129,15 @@ h1{
 }
 .input-wrap.large input{ font-size:32px; padding:0; }
 
+.input-wrap.shake{ animation: shake-x 0.35s ease; border-color:var(--danger); }
+@keyframes shake-x{
+  0%,100%{ transform:translateX(0); }
+  20%{ transform:translateX(-6px); }
+  40%{ transform:translateX(5px); }
+  60%{ transform:translateX(-4px); }
+  80%{ transform:translateX(3px); }
+}
+
 .btn-primary{
   width:100%;
   background:var(--accent);
@@ -181,6 +190,70 @@ h1{
 
 #settings-sheet .field-group{ margin-bottom:16px; }
 #settings-sheet .sheet-panel h2{ margin-bottom:14px; }
+
+/* ---------- SETTINGS SHEET LAYOUT ---------- */
+#settings-sheet .sheet-panel{
+  display:flex; flex-direction:column;
+  padding-bottom:0;
+}
+.settings-scroll{
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  max-height:60vh;
+  padding-bottom:4px;
+}
+.settings-section{
+  border:1px solid var(--line);
+  border-radius:var(--radius-sm);
+  margin-bottom:10px;
+  background:var(--bg-elev-2);
+  overflow:hidden;
+}
+.settings-section summary{
+  list-style:none;
+  cursor:pointer;
+  padding:14px 16px;
+  font-weight:700;
+  font-size:12px;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  color:var(--text-dim);
+  display:flex; align-items:center; justify-content:space-between;
+  -webkit-tap-highlight-color:transparent;
+}
+.settings-section summary::-webkit-details-marker{ display:none; }
+.settings-section summary::after{
+  content:"›";
+  transform:rotate(90deg);
+  transition:transform 0.15s;
+  color:var(--text-faint);
+  font-size:16px;
+}
+.settings-section[open] summary::after{ transform:rotate(-90deg); }
+.settings-section[open] summary{ color:var(--text); border-bottom:1px solid var(--line); }
+.settings-section-body{ padding:16px; }
+.settings-section-body .field-group:last-child{ margin-bottom:0; }
+.settings-section.danger-section{ background:rgba(255,93,93,0.05); }
+.settings-section.danger-section .btn-danger:first-child{ margin-top:0; }
+
+.settings-footer{
+  position:sticky; bottom:0;
+  background:var(--bg-elev);
+  padding:14px 0 24px;
+  border-top:1px solid var(--line);
+  margin-top:4px;
+}
+.settings-footer .btn-ghost{ margin-top:8px; }
+
+.appearance-row{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+}
+.appearance-divider{
+  width:1px; align-self:stretch; min-height:44px;
+  background:var(--line);
+}
+.appearance-row .theme-icon-toggle{ margin-bottom:0; flex:0 0 auto; }
+.appearance-row .accent-picker{ margin-bottom:0; flex:1; }
 
 .btn-danger.severe{
   background:rgba(255,93,93,0.12);

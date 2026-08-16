@@ -173,52 +173,82 @@
       <div class="sheet-handle"></div>
       <h2>SETTINGS</h2>
 
-      <div class="field-group">
-        <label>Cycle amount</label>
-        <div class="input-wrap">
-          <span class="prefix">₱</span>
-          <input type="number" id="set-amount" inputmode="numeric">
+      <div class="settings-scroll">
+
+      <details class="settings-section" open>
+        <summary>Cycle</summary>
+        <div class="settings-section-body">
+          <div class="field-group">
+            <label>Cycle amount</label>
+            <div class="input-wrap">
+              <span class="prefix">₱</span>
+              <input type="number" id="set-amount" inputmode="numeric">
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label>Cycle length (days)</label>
+            <div class="input-wrap small">
+              <input type="number" id="set-days" inputmode="numeric">
+            </div>
+          </div>
+
+          <div class="field-group" style="margin-bottom:0;">
+            <label>Save target</label>
+            <div class="input-wrap">
+              <span class="prefix">₱</span>
+              <input type="number" id="set-save" inputmode="numeric">
+            </div>
+          </div>
         </div>
-      </div>
+      </details>
 
-      <div class="field-group">
-        <label>Cycle length (days)</label>
-        <div class="input-wrap small">
-          <input type="number" id="set-days" inputmode="numeric">
+      <details class="settings-section">
+        <summary>Envelopes</summary>
+        <div class="settings-section-body">
+          <div class="field-group" style="margin-bottom:0;">
+            <label>Name · color · amount</label>
+            <div id="envelope-edit-list"></div>
+            <button class="btn-ghost" id="add-envelope-row">+ ADD ENVELOPE</button>
+          </div>
         </div>
-      </div>
+      </details>
 
-      <div class="field-group">
-        <label>Save target</label>
-        <div class="input-wrap">
-          <span class="prefix">₱</span>
-          <input type="number" id="set-save" inputmode="numeric">
+      <details class="settings-section">
+        <summary>Appearance</summary>
+        <div class="settings-section-body">
+          <div class="field-group" style="margin-bottom:0;">
+            <label>Theme &amp; accent</label>
+            <div class="appearance-row">
+              <div class="theme-icon-toggle">
+                <button class="theme-icon-btn" id="theme-dark" data-theme="dark" title="Dark">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                </button>
+                <button class="theme-icon-btn" id="theme-light" data-theme="light" title="Light">
+                  <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8 6 18M18 6l1.8-1.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </button>
+              </div>
+              <div class="appearance-divider"></div>
+              <div class="accent-picker" id="accent-picker"></div>
+            </div>
+          </div>
         </div>
-      </div>
+      </details>
 
-      <div class="field-group">
-        <label>Envelopes (name · color · amount)</label>
-        <div id="envelope-edit-list"></div>
-        <button class="btn-ghost" id="add-envelope-row">+ ADD ENVELOPE</button>
-      </div>
-
-      <div class="field-group">
-        <label>Appearance</label>
-        <div class="theme-icon-toggle">
-          <button class="theme-icon-btn" id="theme-dark" data-theme="dark" title="Dark">
-            <svg viewBox="0 0 24 24" fill="none"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-          </button>
-          <button class="theme-icon-btn" id="theme-light" data-theme="light" title="Light">
-            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8 6 18M18 6l1.8-1.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-          </button>
+      <details class="settings-section danger-section">
+        <summary>Danger zone</summary>
+        <div class="settings-section-body">
+          <button class="btn-danger" id="settings-reset">START NEW CYCLE NOW</button>
+          <button class="btn-danger severe" id="settings-delete-all">DELETE ALL DATA</button>
         </div>
-        <div class="accent-picker" id="accent-picker"></div>
-      </div>
+      </details>
 
-      <button class="btn-primary" id="settings-save">SAVE CHANGES</button>
-      <button class="btn-danger" id="settings-reset">START NEW CYCLE NOW</button>
-      <button class="btn-danger severe" id="settings-delete-all">DELETE ALL DATA</button>
-      <button class="btn-ghost" id="settings-close">CLOSE</button>
+      </div><!-- /settings-scroll -->
+
+      <div class="settings-footer">
+        <button class="btn-primary" id="settings-save">SAVE CHANGES</button>
+        <button class="btn-ghost" id="settings-close">CLOSE</button>
+      </div>
     </div>
   </div>
 

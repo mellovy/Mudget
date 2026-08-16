@@ -375,7 +375,7 @@ function openAddSheet(logToEdit){
   editingLogId = logToEdit ? logToEdit.id : null;
   document.getElementById('add-amount').value = logToEdit ? logToEdit.amount : '';
   document.getElementById('add-note').value = logToEdit ? (logToEdit.note||'') : '';
-  selectedEnvelope = logToEdit ? logToEdit.envelope : (state.config.envelopes[0]?.name || null);
+  selectedEnvelope = logToEdit ? logToEdit.envelope : (state.lastEnvelope || state.config.envelopes[0]?.name || null);
   document.getElementById('add-confirm').textContent = logToEdit ? 'SAVE CHANGES' : 'ADD';
   document.getElementById('add-delete').classList.toggle('hidden', !logToEdit);
   renderEnvelopePicker();
@@ -418,12 +418,27 @@ function renderEnvelopePicker(){
   });
 }
 
+// remember the last envelope used so the add sheet defaults to it next time
+document.getElementById('add-amount').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    document.getElementById('add-confirm').click();
+  }
+});
+
 document.getElementById('open-add').addEventListener('click', () => openAddSheet(null));
 document.getElementById('add-backdrop').addEventListener('click', closeAddSheet);
 
 document.getElementById('add-confirm').addEventListener('click', () => {
-  const amount = parseFloat(document.getElementById('add-amount').value);
-  if(!amount || amount <= 0) return;
+  const amountInput = document.getElementById('add-amount');
+  const amount = parseFloat(amountInput.value);
+  if(!amount || amount <= 0){
+    const wrap = amountInput.closest('.input-wrap');
+    wrap.classList.add('shake');
+    setTimeout(()=>wrap.classList.remove('shake'), 350);
+    amountInput.focus();
+    return;
+  }
   const note = document.getElementById('add-note').value.trim();
 
   if(editingLogId){
@@ -442,6 +457,7 @@ document.getElementById('add-confirm').addEventListener('click', () => {
       ts: Date.now()
     });
   }
+  state.lastEnvelope = selectedEnvelope;
   saveState(state);
   closeAddSheet();
   render();
