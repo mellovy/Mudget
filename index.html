@@ -203,20 +203,16 @@
       </div>
 
       <div class="field-group">
-        <label>Theme</label>
-        <div class="theme-toggle">
-          <button class="theme-btn" id="theme-dark" data-theme="dark">DARK</button>
-          <button class="theme-btn" id="theme-light" data-theme="light">LIGHT</button>
+        <label>Appearance</label>
+        <div class="theme-icon-toggle">
+          <button class="theme-icon-btn" id="theme-dark" data-theme="dark" title="Dark">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="theme-icon-btn" id="theme-light" data-theme="light" title="Light">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8 6 18M18 6l1.8-1.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
         </div>
-      </div>
-
-      <div class="field-group">
-        <label>Accent color</label>
         <div class="accent-picker" id="accent-picker"></div>
-        <div class="custom-color-row">
-          <input type="color" id="custom-accent" value="#e8918f">
-          <span>custom</span>
-        </div>
       </div>
 
       <button class="btn-primary" id="settings-save">SAVE CHANGES</button>
