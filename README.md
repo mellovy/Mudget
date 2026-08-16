@@ -1,6 +1,6 @@
 # Mudget
 
-A cycle-based budgeting app for dorm life. Set how much you get and how often, split it into envelopes, log spends, and watch your savings bank itself automatically. Works fully offline once installed — no account, no subscription, no ads, your data never leaves your phone.
+A cycle-based budgeting app for people who struggle to save. Set how much you get and how often, split it into envelopes, log spends, and watch your savings bank itself automatically. Works fully offline once installed — no account, no subscription, no ads, your data never leaves your phone.
 
 **Live app:** https://mellovy.github.io/Mudget/
 
