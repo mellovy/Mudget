@@ -1,4 +1,4 @@
-const CACHE = 'mudget-v8';
+const CACHE = 'mudget-v10';
 const ASSETS = [
   './',
   './index.html',
