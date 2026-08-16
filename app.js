@@ -25,13 +25,23 @@ function peso(n){
 }
 function dayMs(){ return 24*60*60*1000; }
 
+const ACCENTS = ['#b4ff39','#39d6ff','#ff8fd6','#ffb84d','#8f7bff','#ff6b6b'];
+const ENV_COLORS = ['#b4ff39','#39d6ff','#ff8fd6','#ffb84d','#8f7bff','#ff6b6b','#6fe3a0','#f4f1ea'];
+
 function defaultEnvelopes(amount, save){
   const spendable = Math.max(amount - save, 0);
   return [
-    { name:'Food', amount: Math.round(spendable*0.65) },
-    { name:'Transpo', amount: Math.round(spendable*0.2) },
-    { name:'Buffer', amount: spendable - Math.round(spendable*0.65) - Math.round(spendable*0.2) }
+    { name:'Food', amount: Math.round(spendable*0.65), color: ENV_COLORS[0] },
+    { name:'Transpo', amount: Math.round(spendable*0.2), color: ENV_COLORS[1] },
+    { name:'Buffer', amount: spendable - Math.round(spendable*0.65) - Math.round(spendable*0.2), color: ENV_COLORS[2] }
   ];
+}
+
+function applyAccent(hex){
+  document.documentElement.style.setProperty('--accent', hex);
+  // derive a dim + glow version
+  document.documentElement.style.setProperty('--accent-dim', hex + 'aa');
+  document.documentElement.style.setProperty('--accent-glow', hex + '30');
 }
 
 // ---------- ONBOARDING ----------
@@ -43,7 +53,8 @@ document.getElementById('ob-continue').addEventListener('click', () => {
   state = {
     config: {
       amount, days, save,
-      envelopes: defaultEnvelopes(amount, save)
+      envelopes: defaultEnvelopes(amount, save),
+      accent: ACCENTS[0]
     },
     cycleStart: Date.now(),
     logs: [],
@@ -139,11 +150,11 @@ function renderEnvelopes(){
     card.className = 'envelope-card';
     card.innerHTML = `
       <div class="envelope-top">
-        <div class="envelope-name">${env.name}</div>
+        <div class="envelope-name"><span class="envelope-dot" style="background:${env.color||'#888'}"></span>${env.name}</div>
         <div class="envelope-nums"><span class="used">${peso(used)}</span> / ${peso(env.amount)}</div>
       </div>
       <div class="envelope-bar-wrap">
-        <div class="envelope-bar ${over?'over':''}" style="width:${(pct*100).toFixed(1)}%"></div>
+        <div class="envelope-bar ${over?'over':''}" style="width:${(pct*100).toFixed(1)}%; ${!over&&env.color?`background:${env.color}`:''}"></div>
       </div>
     `;
     wrap.appendChild(card);
@@ -158,46 +169,227 @@ function renderLog(){
     return;
   }
   [...state.logs].reverse().forEach(log => {
+    const env = state.config.envelopes.find(e=>e.name===log.envelope);
     const item = document.createElement('div');
     item.className = 'log-item';
+    item.style.cursor = 'pointer';
     const d = new Date(log.ts);
     const timeStr = d.toLocaleDateString('en-PH', { month:'short', day:'numeric' }) + ' · ' +
                      d.toLocaleTimeString('en-PH', { hour:'numeric', minute:'2-digit' });
     item.innerHTML = `
       <div class="log-left">
         <div class="log-note">${log.note || log.envelope}</div>
-        <div class="log-meta">${log.envelope} · ${timeStr}</div>
+        <div class="log-meta"><span class="envelope-dot" style="display:inline-block;background:${env?env.color:'#666'}"></span> ${log.envelope} · ${timeStr}</div>
       </div>
-      <div style="display:flex;align-items:center;">
-        <div class="log-amount">${peso(log.amount)}</div>
-        <button class="log-del" data-id="${log.id}">×</button>
+      <div class="log-amount">${peso(log.amount)}</div>
+    `;
+    item.addEventListener('click', () => openAddSheet(log));
+    wrap.appendChild(item);
+  });
+}
+
+// ---------- TABS ----------
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.add('hidden'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.remove('hidden');
+    if(btn.dataset.tab === 'calendar') renderCalendar();
+    if(btn.dataset.tab === 'stats') renderStats();
+  });
+});
+
+// ---------- CALENDAR ----------
+let calViewDate = new Date();
+let calSelectedDay = null;
+
+function allLogsCombined(){
+  // current cycle logs + all history logs
+  let all = [...state.logs];
+  state.history.forEach(h => { all = all.concat(h.logs || []); });
+  return all;
+}
+
+function renderCalendar(){
+  const label = calViewDate.toLocaleDateString('en-PH', { month:'long', year:'numeric' });
+  document.getElementById('cal-month-label').textContent = label.toUpperCase();
+
+  const year = calViewDate.getFullYear();
+  const month = calViewDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+
+  const logs = allLogsCombined();
+  const dailyTotals = {};
+  logs.forEach(l => {
+    const d = new Date(l.ts);
+    if(d.getFullYear()===year && d.getMonth()===month){
+      const key = d.getDate();
+      dailyTotals[key] = (dailyTotals[key]||0) + l.amount;
+    }
+  });
+
+  const avgDay = state.config.amount / state.config.days;
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+
+  for(let i=0;i<firstDay;i++){
+    const empty = document.createElement('div');
+    empty.className = 'cal-day empty';
+    grid.appendChild(empty);
+  }
+
+  const today = new Date();
+  for(let day=1; day<=daysInMonth; day++){
+    const cell = document.createElement('div');
+    cell.className = 'cal-day';
+    const isToday = today.getFullYear()===year && today.getMonth()===month && today.getDate()===day;
+    if(isToday) cell.classList.add('today');
+    if(calSelectedDay && calSelectedDay.y===year && calSelectedDay.m===month && calSelectedDay.d===day){
+      cell.classList.add('selected');
+    }
+    const total = dailyTotals[day];
+    let dotHtml = '';
+    if(total){
+      let cls = 'ok';
+      if(total > avgDay*1.5) cls = 'danger';
+      else if(total > avgDay) cls = 'warn';
+      dotHtml = `<div class="dot ${cls}"></div>`;
+    }
+    cell.innerHTML = `<span>${day}</span>${dotHtml}`;
+    cell.addEventListener('click', () => {
+      calSelectedDay = { y:year, m:month, d:day };
+      renderCalendar();
+      renderCalDayLog();
+    });
+    grid.appendChild(cell);
+  }
+
+  if(!calSelectedDay) renderCalDayLog();
+}
+
+function renderCalDayLog(){
+  const wrap = document.getElementById('cal-day-log');
+  if(!calSelectedDay){
+    wrap.innerHTML = '<div class="log-empty">tap a day to see spends</div>';
+    return;
+  }
+  const logs = allLogsCombined().filter(l => {
+    const d = new Date(l.ts);
+    return d.getFullYear()===calSelectedDay.y && d.getMonth()===calSelectedDay.m && d.getDate()===calSelectedDay.d;
+  });
+  if(logs.length === 0){
+    wrap.innerHTML = '<div class="log-empty">nothing logged this day</div>';
+    return;
+  }
+  wrap.innerHTML = '';
+  logs.forEach(log => {
+    const env = state.config.envelopes.find(e=>e.name===log.envelope);
+    const item = document.createElement('div');
+    item.className = 'log-item';
+    const d = new Date(log.ts);
+    const timeStr = d.toLocaleTimeString('en-PH', { hour:'numeric', minute:'2-digit' });
+    item.innerHTML = `
+      <div class="log-left">
+        <div class="log-note">${log.note || log.envelope}</div>
+        <div class="log-meta"><span class="envelope-dot" style="display:inline-block;background:${env?env.color:'#666'}"></span> ${log.envelope} · ${timeStr}</div>
       </div>
+      <div class="log-amount">${peso(log.amount)}</div>
     `;
     wrap.appendChild(item);
   });
+}
 
-  wrap.querySelectorAll('.log-del').forEach(btn => {
-    btn.addEventListener('click', () => {
-      state.logs = state.logs.filter(l => l.id !== btn.dataset.id);
-      saveState(state);
-      render();
-    });
+document.getElementById('cal-prev').addEventListener('click', () => {
+  calViewDate.setMonth(calViewDate.getMonth()-1);
+  renderCalendar();
+});
+document.getElementById('cal-next').addEventListener('click', () => {
+  calViewDate.setMonth(calViewDate.getMonth()+1);
+  renderCalendar();
+});
+
+// ---------- STATS ----------
+function renderStats(){
+  const cyclesCompleted = state.history.length;
+  const avgSpent = cyclesCompleted
+    ? Math.round(state.history.reduce((s,h)=>s+h.spent,0)/cyclesCompleted)
+    : currentSpentTotal();
+  const bestCycle = cyclesCompleted
+    ? Math.max(...state.history.map(h=>h.leftover))
+    : (state.config.amount - currentSpentTotal());
+  const streak = (() => {
+    let s = 0;
+    for(const h of state.history){
+      if(h.leftover >= state.config.save) s++; else break;
+    }
+    return s;
+  })();
+
+  const grid = document.getElementById('stats-summary');
+  grid.innerHTML = `
+    <div class="stat-card"><div class="stat-label">TOTAL SAVED</div><div class="stat-value good">${peso(state.lifetimeSaved)}</div></div>
+    <div class="stat-card"><div class="stat-label">CYCLES DONE</div><div class="stat-value">${cyclesCompleted}</div></div>
+    <div class="stat-card"><div class="stat-label">AVG SPENT/CYCLE</div><div class="stat-value">${peso(avgSpent)}</div></div>
+    <div class="stat-card"><div class="stat-label">SAVE STREAK</div><div class="stat-value accent">${streak}</div></div>
+  `;
+
+  const histWrap = document.getElementById('history-list');
+  if(state.history.length === 0){
+    histWrap.innerHTML = '<div class="log-empty">finish your first cycle to see history</div>';
+    return;
+  }
+  histWrap.innerHTML = '';
+  state.history.forEach(h => {
+    const d = new Date(h.start);
+    const dateStr = d.toLocaleDateString('en-PH', { month:'short', day:'numeric' });
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML = `
+      <div class="history-left">
+        <div class="history-date">Cycle from ${dateStr}</div>
+        <div class="history-sub">spent ${peso(h.spent)}</div>
+      </div>
+      <div class="history-leftover ${h.leftover<0?'neg':'pos'}">${h.leftover<0?'-':'+'}${peso(Math.abs(h.leftover))}</div>
+    `;
+    histWrap.appendChild(item);
   });
 }
 
 // ---------- ADD EXPENSE SHEET ----------
 let selectedEnvelope = null;
+let editingLogId = null;
 const addSheet = document.getElementById('add-sheet');
+const QUICK_AMOUNTS = [20, 50, 100, 150];
 
-function openAddSheet(){
-  document.getElementById('add-amount').value = '';
-  document.getElementById('add-note').value = '';
-  selectedEnvelope = state.config.envelopes[0]?.name || null;
+function openAddSheet(logToEdit){
+  editingLogId = logToEdit ? logToEdit.id : null;
+  document.getElementById('add-amount').value = logToEdit ? logToEdit.amount : '';
+  document.getElementById('add-note').value = logToEdit ? (logToEdit.note||'') : '';
+  selectedEnvelope = logToEdit ? logToEdit.envelope : (state.config.envelopes[0]?.name || null);
+  document.getElementById('add-confirm').textContent = logToEdit ? 'SAVE CHANGES' : 'ADD';
+  document.getElementById('add-delete').classList.toggle('hidden', !logToEdit);
   renderEnvelopePicker();
+  renderQuickAmounts();
   addSheet.classList.remove('hidden');
   setTimeout(()=>document.getElementById('add-amount').focus(), 100);
 }
-function closeAddSheet(){ addSheet.classList.add('hidden'); }
+function closeAddSheet(){ addSheet.classList.add('hidden'); editingLogId = null; }
+
+function renderQuickAmounts(){
+  const wrap = document.getElementById('quick-amounts');
+  wrap.innerHTML = '';
+  QUICK_AMOUNTS.forEach(amt => {
+    const chip = document.createElement('div');
+    chip.className = 'quick-chip';
+    chip.textContent = '₱'+amt;
+    chip.addEventListener('click', () => {
+      document.getElementById('add-amount').value = amt;
+    });
+    wrap.appendChild(chip);
+  });
+}
 
 function renderEnvelopePicker(){
   const wrap = document.getElementById('envelope-picker');
@@ -206,6 +398,10 @@ function renderEnvelopePicker(){
     const chip = document.createElement('div');
     chip.className = 'env-chip' + (env.name === selectedEnvelope ? ' selected' : '');
     chip.textContent = env.name;
+    if(env.name === selectedEnvelope){
+      chip.style.borderColor = env.color;
+      chip.style.color = env.color;
+    }
     chip.addEventListener('click', () => {
       selectedEnvelope = env.name;
       renderEnvelopePicker();
@@ -214,7 +410,7 @@ function renderEnvelopePicker(){
   });
 }
 
-document.getElementById('open-add').addEventListener('click', openAddSheet);
+document.getElementById('open-add').addEventListener('click', () => openAddSheet(null));
 document.getElementById('add-backdrop').addEventListener('click', closeAddSheet);
 
 document.getElementById('add-confirm').addEventListener('click', () => {
@@ -222,13 +418,30 @@ document.getElementById('add-confirm').addEventListener('click', () => {
   if(!amount || amount <= 0) return;
   const note = document.getElementById('add-note').value.trim();
 
-  state.logs.push({
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-    amount,
-    envelope: selectedEnvelope || 'Buffer',
-    note,
-    ts: Date.now()
-  });
+  if(editingLogId){
+    const log = state.logs.find(l => l.id === editingLogId);
+    if(log){
+      log.amount = amount;
+      log.note = note;
+      log.envelope = selectedEnvelope || 'Buffer';
+    }
+  } else {
+    state.logs.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      amount,
+      envelope: selectedEnvelope || 'Buffer',
+      note,
+      ts: Date.now()
+    });
+  }
+  saveState(state);
+  closeAddSheet();
+  render();
+});
+
+document.getElementById('add-delete').addEventListener('click', () => {
+  if(!editingLogId) return;
+  state.logs = state.logs.filter(l => l.id !== editingLogId);
   saveState(state);
   closeAddSheet();
   render();
@@ -242,7 +455,24 @@ function openSettings(){
   document.getElementById('set-days').value = state.config.days;
   document.getElementById('set-save').value = state.config.save;
   renderEnvelopeEditList();
+  renderAccentPicker();
   settingsSheet.classList.remove('hidden');
+}
+
+function renderAccentPicker(){
+  const wrap = document.getElementById('accent-picker');
+  wrap.innerHTML = '';
+  ACCENTS.forEach(hex => {
+    const sw = document.createElement('div');
+    sw.className = 'accent-swatch' + (state.config.accent === hex ? ' selected' : '');
+    sw.style.background = hex;
+    sw.addEventListener('click', () => {
+      state.config.accent = hex;
+      applyAccent(hex);
+      renderAccentPicker();
+    });
+    wrap.appendChild(sw);
+  });
 }
 function closeSettings(){ settingsSheet.classList.add('hidden'); }
 
@@ -254,6 +484,7 @@ function renderEnvelopeEditList(){
     row.className = 'env-edit-row';
     row.innerHTML = `
       <input class="env-name" data-i="${i}" value="${env.name}">
+      <input class="env-color" data-i="${i}" type="color" value="${env.color||'#b4ff39'}">
       <input class="env-amt" data-i="${i}" type="number" value="${env.amount}">
       <button data-i="${i}" class="env-del">×</button>
     `;
@@ -272,14 +503,16 @@ document.getElementById('settings-backdrop').addEventListener('click', closeSett
 document.getElementById('settings-close').addEventListener('click', closeSettings);
 
 document.getElementById('add-envelope-row').addEventListener('click', () => {
-  state.config.envelopes.push({ name:'New', amount:0 });
+  const nextColor = ENV_COLORS[state.config.envelopes.length % ENV_COLORS.length];
+  state.config.envelopes.push({ name:'New', amount:0, color: nextColor });
   renderEnvelopeEditList();
 });
 
 document.getElementById('settings-save').addEventListener('click', () => {
   const names = [...document.querySelectorAll('.env-name')].map(i=>i.value.trim() || 'Envelope');
   const amts = [...document.querySelectorAll('.env-amt')].map(i=>parseFloat(i.value)||0);
-  state.config.envelopes = names.map((name,i)=>({ name, amount: amts[i] }));
+  const colors = [...document.querySelectorAll('.env-color')].map(i=>i.value);
+  state.config.envelopes = names.map((name,i)=>({ name, amount: amts[i], color: colors[i] }));
 
   state.config.amount = parseFloat(document.getElementById('set-amount').value) || state.config.amount;
   state.config.days = parseInt(document.getElementById('set-days').value) || state.config.days;
@@ -311,6 +544,11 @@ function boot(){
     return;
   }
   checkRollover();
+  if(!state.config.accent) state.config.accent = ACCENTS[0];
+  if(state.config.envelopes.some(e=>!e.color)){
+    state.config.envelopes.forEach((e,i)=>{ if(!e.color) e.color = ENV_COLORS[i % ENV_COLORS.length]; });
+  }
+  applyAccent(state.config.accent);
   onboardingEl.classList.add('hidden');
   mainEl.classList.remove('hidden');
   render();

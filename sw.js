@@ -1,4 +1,4 @@
-const CACHE = 'stash-v1';
+const CACHE = 'mudget-v2';
 const ASSETS = [
   './',
   './index.html',

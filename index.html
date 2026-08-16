@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Stash">
+<meta name="apple-mobile-web-app-title" content="Mudget">
 <meta name="theme-color" content="#0d0f0e">
-<title>Stash</title>
+<title>Mudget</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,7 +25,7 @@
     <div class="onboard-inner">
       <div class="brand">
         <span class="brand-mark">◆</span>
-        <h1>STASH</h1>
+        <h1>MUDGET</h1>
       </div>
       <p class="tag">cycle budgeting, built for dorm life</p>
 
@@ -62,10 +62,18 @@
     <header class="topbar">
       <div class="topbar-left">
         <span class="brand-mark small">◆</span>
-        <span class="brand-name">STASH</span>
+        <span class="brand-name">MUDGET</span>
       </div>
       <button class="icon-btn" id="open-settings">⚙</button>
     </header>
+
+    <div class="tabbar">
+      <button class="tab-btn active" data-tab="home">HOME</button>
+      <button class="tab-btn" data-tab="calendar">CALENDAR</button>
+      <button class="tab-btn" data-tab="stats">STATS</button>
+    </div>
+
+    <div id="tab-home" class="tab-panel">
 
     <div class="cycle-card">
       <div class="cycle-top">
@@ -104,6 +112,34 @@
 
     <div class="log-list" id="log-list"></div>
 
+    </div><!-- /tab-home -->
+
+    <div id="tab-calendar" class="tab-panel hidden">
+      <div class="cal-card">
+        <div class="cal-header">
+          <button class="icon-btn small" id="cal-prev">‹</button>
+          <div class="cal-month-label" id="cal-month-label">MONTH</div>
+          <button class="icon-btn small" id="cal-next">›</button>
+        </div>
+        <div class="cal-weekdays">
+          <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <div class="cal-legend">
+          <span class="legend-dot ok"></span><span>under pace</span>
+          <span class="legend-dot warn"></span><span>heavy day</span>
+        </div>
+      </div>
+      <div class="section-label">SELECTED DAY</div>
+      <div class="log-list" id="cal-day-log"></div>
+    </div>
+
+    <div id="tab-stats" class="tab-panel hidden">
+      <div class="stats-grid" id="stats-summary"></div>
+      <div class="section-label">CYCLE HISTORY</div>
+      <div class="history-list" id="history-list"></div>
+    </div>
+
     <button class="fab" id="open-add">＋</button>
   </section>
 
@@ -119,11 +155,14 @@
         <input type="number" id="add-amount" placeholder="0" inputmode="numeric" autofocus>
       </div>
 
+      <div class="quick-amounts" id="quick-amounts"></div>
+
       <div class="envelope-picker" id="envelope-picker"></div>
 
       <input type="text" id="add-note" class="note-input" placeholder="what was it for? (optional)">
 
       <button class="btn-primary" id="add-confirm">ADD</button>
+      <button class="btn-danger hidden" id="add-delete">DELETE ENTRY</button>
     </div>
   </div>
 
@@ -158,9 +197,14 @@
       </div>
 
       <div class="field-group">
-        <label>Envelopes (name : amount)</label>
+        <label>Envelopes (name · color · amount)</label>
         <div id="envelope-edit-list"></div>
         <button class="btn-ghost" id="add-envelope-row">+ ADD ENVELOPE</button>
+      </div>
+
+      <div class="field-group">
+        <label>Accent color</label>
+        <div class="accent-picker" id="accent-picker"></div>
       </div>
 
       <button class="btn-primary" id="settings-save">SAVE CHANGES</button>
