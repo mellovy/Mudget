@@ -567,6 +567,15 @@ document.getElementById('settings-reset').addEventListener('click', () => {
   render();
 });
 
+document.getElementById('settings-delete-all').addEventListener('click', () => {
+  if(!confirm('Delete everything? This wipes all logs, envelopes, history, and saved totals. This cannot be undone.')) return;
+  if(!confirm('Really sure? Last chance to back out.')) return;
+  localStorage.removeItem(STORE_KEY);
+  state = null;
+  closeSettings();
+  location.reload();
+});
+
 // ---------- BOOT ----------
 function boot(){
   if(!state){

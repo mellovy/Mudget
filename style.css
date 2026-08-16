@@ -179,6 +179,15 @@ h1{
   margin-top:10px;
 }
 
+#settings-sheet .field-group{ margin-bottom:16px; }
+#settings-sheet .sheet-panel h2{ margin-bottom:14px; }
+
+.btn-danger.severe{
+  background:rgba(255,93,93,0.12);
+  border-color:var(--danger);
+  font-weight:700;
+}
+
 /* ---------- TOPBAR ---------- */
 .topbar{
   display:flex; align-items:center; justify-content:space-between;
@@ -492,8 +501,9 @@ h1{
   border-bottom:none;
   border-radius:20px 20px 0 0;
   padding:12px 20px 32px;
-  max-height:85vh;
+  max-height:92vh;
   overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
   animation: sheet-up 0.25s ease;
 }
 @keyframes sheet-up{ from{ transform:translateY(100%);} to{ transform:translateY(0);} }
