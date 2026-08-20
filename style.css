@@ -486,6 +486,18 @@ h1{
 .num-value.accent{ color:var(--accent); }
 .num-value.good{ color:var(--good); }
 
+.rec-per-day{
+  margin-top:16px;
+  padding-top:14px;
+  border-top:1px solid var(--line);
+  font-size:11px;
+  letter-spacing:0.5px;
+  color:var(--text-dim);
+  font-family:'JetBrains Mono', monospace;
+}
+.rec-per-day .rec-amt{ color:var(--accent); font-weight:700; }
+.rec-per-day.over .rec-amt{ color:var(--danger); }
+
 /* ---------- SECTIONS ---------- */
 .section-label{
   font-size:11px; letter-spacing:2px; color:var(--text-faint); font-weight:700;
@@ -603,6 +615,22 @@ h1{
   outline:none;
 }
 .note-input:focus{ border-color:var(--accent-dim); }
+
+.date-field{ margin-bottom:16px; }
+.date-input{
+  width:100%;
+  background:var(--bg-elev-2);
+  border:1px solid var(--line);
+  border-radius:var(--radius-sm);
+  padding:12px 14px;
+  color:var(--text);
+  font-family:'JetBrains Mono', monospace;
+  font-size:13px;
+  outline:none;
+  color-scheme:dark;
+}
+.date-input:focus{ border-color:var(--accent-dim); }
+[data-theme="light"] .date-input{ color-scheme:light; }
 
 .env-edit-row{
   display:flex; gap:8px; margin-bottom:8px;

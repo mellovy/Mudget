@@ -25,6 +25,19 @@ function peso(n){
 }
 function dayMs(){ return 24*60*60*1000; }
 
+// convert a timestamp to the local value a <input type="datetime-local"> expects
+function toDatetimeLocalValue(ts){
+  const d = new Date(ts);
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+// convert a <input type="datetime-local"> value back into a timestamp (local time)
+function fromDatetimeLocalValue(val){
+  if(!val) return Date.now();
+  const t = new Date(val).getTime();
+  return isNaN(t) ? Date.now() : t;
+}
+
 const ACCENTS = ['#e5484d','#ff6b35','#f5c542','#4dd68a','#3ea8ff','#a855f7'];
 const ENV_COLORS = ['#e5484d','#ff6b35','#f5c542','#4dd68a','#3ea8ff','#a855f7','#2dd4bf','#f4f1ea'];
 
@@ -107,6 +120,10 @@ function envelopeSpent(name){
 }
 
 function render(){
+  // keep the cycle honest: if enough time has passed while the app was
+  // sitting open (not just reloaded), roll over before drawing anything
+  checkRollover();
+
   const { config } = state;
   const elapsed = Date.now() - state.cycleStart;
   const cycleMs = config.days * dayMs();
@@ -125,6 +142,17 @@ function render(){
   document.getElementById('spent-total').textContent = peso(spent);
   document.getElementById('remaining-total').textContent = peso(remaining);
   document.getElementById('saved-total').textContent = peso(state.lifetimeSaved);
+
+  const recEl = document.getElementById('rec-per-day');
+  if(recEl){
+    // days left including the partial day in progress, so "today" still counts
+    const daysLeftForBudget = Math.max((cycleMs - elapsed) / dayMs(), 1/24);
+    const recPerDay = remaining / daysLeftForBudget;
+    recEl.classList.toggle('over', remaining < 0);
+    recEl.innerHTML = remaining < 0
+      ? `over budget by <span class="rec-amt">${peso(Math.abs(remaining))}</span> — ease up for the rest of the cycle`
+      : `spend up to <span class="rec-amt">${peso(recPerDay)}</span>/day to finish the cycle on target`;
+  }
 
   const bar = document.getElementById('cycle-bar');
   bar.style.width = (pctSpent*100).toFixed(1) + '%';
@@ -176,7 +204,7 @@ function renderLog(){
     wrap.innerHTML = '<div class="log-empty">no spends logged this cycle yet</div>';
     return;
   }
-  [...state.logs].reverse().forEach(log => {
+  [...state.logs].sort((a,b)=>b.ts-a.ts).forEach(log => {
     const env = state.config.envelopes.find(e=>e.name===log.envelope);
     const item = document.createElement('div');
     item.className = 'log-item';
@@ -375,6 +403,7 @@ function openAddSheet(logToEdit){
   editingLogId = logToEdit ? logToEdit.id : null;
   document.getElementById('add-amount').value = logToEdit ? logToEdit.amount : '';
   document.getElementById('add-note').value = logToEdit ? (logToEdit.note||'') : '';
+  document.getElementById('add-date').value = toDatetimeLocalValue(logToEdit ? logToEdit.ts : Date.now());
   selectedEnvelope = logToEdit ? logToEdit.envelope : (state.lastEnvelope || state.config.envelopes[0]?.name || null);
   document.getElementById('add-confirm').textContent = logToEdit ? 'SAVE CHANGES' : 'ADD';
   document.getElementById('add-delete').classList.toggle('hidden', !logToEdit);
@@ -440,6 +469,7 @@ document.getElementById('add-confirm').addEventListener('click', () => {
     return;
   }
   const note = document.getElementById('add-note').value.trim();
+  const ts = fromDatetimeLocalValue(document.getElementById('add-date').value);
 
   if(editingLogId){
     const log = state.logs.find(l => l.id === editingLogId);
@@ -447,6 +477,7 @@ document.getElementById('add-confirm').addEventListener('click', () => {
       log.amount = amount;
       log.note = note;
       log.envelope = selectedEnvelope || 'Buffer';
+      log.ts = ts;
     }
   } else {
     state.logs.push({
@@ -454,7 +485,7 @@ document.getElementById('add-confirm').addEventListener('click', () => {
       amount,
       envelope: selectedEnvelope || 'Buffer',
       note,
-      ts: Date.now()
+      ts
     });
   }
   state.lastEnvelope = selectedEnvelope;
@@ -474,10 +505,19 @@ document.getElementById('add-delete').addEventListener('click', () => {
 // ---------- SETTINGS SHEET ----------
 const settingsSheet = document.getElementById('settings-sheet');
 
+// snapshot taken when the settings sheet opens, so on save we can tell
+// whether the envelope amounts were hand-edited or should auto-scale
+// to follow a changed cycle amount / save target
+let settingsOpenSnapshot = null;
+
 function openSettings(){
   document.getElementById('set-amount').value = state.config.amount;
   document.getElementById('set-days').value = state.config.days;
   document.getElementById('set-save').value = state.config.save;
+  settingsOpenSnapshot = {
+    spendable: state.config.amount - state.config.save,
+    envTotal: state.config.envelopes.reduce((s,e)=>s+e.amount,0)
+  };
   renderEnvelopeEditList();
   renderAccentPicker();
   settingsSheet.classList.remove('hidden');
@@ -555,12 +595,32 @@ document.getElementById('settings-save').addEventListener('click', () => {
   const names = [...document.querySelectorAll('.env-name')].map(i=>i.value.trim() || 'Envelope');
   const amts = [...document.querySelectorAll('.env-amt')].map(i=>parseFloat(i.value)||0);
   const colors = [...document.querySelectorAll('.env-color')].map(i=>i.value);
-  state.config.envelopes = names.map((name,i)=>({ name, amount: amts[i], color: colors[i] }));
+  let envelopes = names.map((name,i)=>({ name, amount: amts[i], color: colors[i] }));
 
-  state.config.amount = parseFloat(document.getElementById('set-amount').value) || state.config.amount;
-  state.config.days = parseInt(document.getElementById('set-days').value) || state.config.days;
-  state.config.save = parseFloat(document.getElementById('set-save').value) || state.config.save;
+  const newAmount = parseFloat(document.getElementById('set-amount').value) || state.config.amount;
+  const newDays = parseInt(document.getElementById('set-days').value) || state.config.days;
+  const newSave = parseFloat(document.getElementById('set-save').value) || state.config.save;
+  const newSpendable = Math.max(newAmount - newSave, 0);
 
+  // auto-adjust envelope amounts if the cycle amount/save target changed
+  // but the person didn't also hand-edit the envelope amounts themselves —
+  // scale everything proportionally so envelopes keep tracking the budget
+  if(settingsOpenSnapshot){
+    const enteredTotal = envelopes.reduce((s,e)=>s+e.amount,0);
+    const envelopesUntouched = Math.abs(enteredTotal - settingsOpenSnapshot.envTotal) < 1;
+    const spendableChanged = Math.abs(newSpendable - settingsOpenSnapshot.spendable) >= 1;
+    if(envelopesUntouched && spendableChanged && settingsOpenSnapshot.spendable > 0){
+      const ratio = newSpendable / settingsOpenSnapshot.spendable;
+      envelopes = envelopes.map(e => ({ ...e, amount: Math.max(Math.round(e.amount * ratio), 0) }));
+    }
+  }
+
+  state.config.envelopes = envelopes;
+  state.config.amount = newAmount;
+  state.config.days = newDays;
+  state.config.save = newSave;
+
+  settingsOpenSnapshot = null;
   saveState(state);
   closeSettings();
   render();
