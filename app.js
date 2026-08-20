@@ -150,8 +150,8 @@ function render(){
     const recPerDay = remaining / daysLeftForBudget;
     recEl.classList.toggle('over', remaining < 0);
     recEl.innerHTML = remaining < 0
-      ? `over budget by <span class="rec-amt">${peso(Math.abs(remaining))}</span> — ease up for the rest of the cycle`
-      : `spend up to <span class="rec-amt">${peso(recPerDay)}</span>/day to finish the cycle on target`;
+      ? `<span class="rec-amt">${peso(Math.abs(remaining))}</span> over budget`
+      : `<span class="rec-amt">${peso(recPerDay)}</span>/day left to spend`;
   }
 
   const bar = document.getElementById('cycle-bar');
@@ -180,6 +180,7 @@ function renderEnvelopes(){
   wrap.innerHTML = '';
   state.config.envelopes.forEach(env => {
     const used = envelopeSpent(env.name);
+    const left = env.amount - used;
     const pct = env.amount > 0 ? Math.min(1, used/env.amount) : 0;
     const over = used > env.amount;
     const card = document.createElement('div');
@@ -192,6 +193,7 @@ function renderEnvelopes(){
       <div class="envelope-bar-wrap">
         <div class="envelope-bar ${over?'over':''}" style="width:${(pct*100).toFixed(1)}%; ${!over&&env.color?`background:${env.color}`:''}"></div>
       </div>
+      <div class="envelope-left ${over?'over':''}">${over ? peso(Math.abs(left))+' over' : peso(left)+' left'}</div>
     `;
     wrap.appendChild(card);
   });
@@ -414,10 +416,29 @@ function openAddSheet(logToEdit){
 }
 function closeAddSheet(){ addSheet.classList.add('hidden'); editingLogId = null; }
 
+// picks your 4 most-used spend amounts (across current + past cycles) so
+// the quick-chips actually reflect real habits instead of static guesses;
+// falls back to sensible defaults until there's enough history
+function getSmartQuickAmounts(){
+  const counts = {};
+  allLogsCombined().forEach(l => {
+    const amt = Math.round(l.amount);
+    counts[amt] = (counts[amt]||0) + 1;
+  });
+  const frequent = Object.keys(counts)
+    .map(Number)
+    .sort((a,b) => counts[b]-counts[a] || a-b)
+    .slice(0,4);
+  if(frequent.length === 4) return frequent.sort((a,b)=>a-b);
+  const fallback = QUICK_AMOUNTS.filter(a => !frequent.includes(a));
+  return [...frequent, ...fallback].slice(0,4).sort((a,b)=>a-b);
+}
+
+
 function renderQuickAmounts(){
   const wrap = document.getElementById('quick-amounts');
   wrap.innerHTML = '';
-  QUICK_AMOUNTS.forEach(amt => {
+  getSmartQuickAmounts().forEach(amt => {
     const chip = document.createElement('div');
     chip.className = 'quick-chip';
     chip.textContent = '₱'+amt;
@@ -449,6 +470,12 @@ function renderEnvelopePicker(){
 
 // remember the last envelope used so the add sheet defaults to it next time
 document.getElementById('add-amount').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    document.getElementById('add-confirm').click();
+  }
+});
+document.getElementById('add-note').addEventListener('keydown', e => {
   if(e.key === 'Enter'){
     e.preventDefault();
     document.getElementById('add-confirm').click();
@@ -496,11 +523,40 @@ document.getElementById('add-confirm').addEventListener('click', () => {
 
 document.getElementById('add-delete').addEventListener('click', () => {
   if(!editingLogId) return;
+  const removed = state.logs.find(l => l.id === editingLogId);
+  const removedIndex = state.logs.findIndex(l => l.id === editingLogId);
   state.logs = state.logs.filter(l => l.id !== editingLogId);
   saveState(state);
   closeAddSheet();
   render();
+  if(removed) showUndoToast('Entry deleted', () => {
+    state.logs.splice(Math.min(removedIndex, state.logs.length), 0, removed);
+    saveState(state);
+    render();
+  });
 });
+
+// ---------- UNDO TOAST ----------
+let undoToastTimer = null;
+function showUndoToast(message, onUndo){
+  const toast = document.getElementById('undo-toast');
+  if(!toast) return;
+  clearTimeout(undoToastTimer);
+  document.getElementById('undo-toast-msg').textContent = message;
+  toast.classList.remove('hidden');
+  toast.classList.add('show');
+
+  const undoBtn = document.getElementById('undo-toast-btn');
+  const cleanup = () => {
+    toast.classList.remove('show');
+    setTimeout(()=>toast.classList.add('hidden'), 200);
+    undoBtn.removeEventListener('click', handler);
+  };
+  const handler = () => { onUndo(); cleanup(); clearTimeout(undoToastTimer); };
+  undoBtn.addEventListener('click', handler);
+
+  undoToastTimer = setTimeout(cleanup, 5000);
+}
 
 // ---------- SETTINGS SHEET ----------
 const settingsSheet = document.getElementById('settings-sheet');
