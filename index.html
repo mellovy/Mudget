@@ -112,6 +112,8 @@
 
     <div class="section-label">LOG</div>
 
+    <input type="text" id="log-search" class="search-input" placeholder="search notes or envelopes…">
+
     <div class="log-list" id="log-list"></div>
 
     </div><!-- /tab-home -->
@@ -138,6 +140,8 @@
 
     <div id="tab-stats" class="tab-panel hidden">
       <div class="stats-grid" id="stats-summary"></div>
+      <div class="section-label">SPEND PER CYCLE</div>
+      <div class="chart-card" id="cycle-chart"></div>
       <div class="section-label">CYCLE HISTORY</div>
       <div class="history-list" id="history-list"></div>
     </div>
@@ -220,6 +224,42 @@
             <label>Name · color · amount</label>
             <div id="envelope-edit-list"></div>
             <button class="btn-ghost" id="add-envelope-row">+ ADD ENVELOPE</button>
+          </div>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>Recurring expenses</summary>
+        <div class="settings-section-body">
+          <div class="field-group" style="margin-bottom:8px;">
+            <label>Auto-logged at the start of every new cycle</label>
+            <div id="recurring-edit-list"></div>
+            <button class="btn-ghost" id="add-recurring-row">+ ADD RECURRING</button>
+          </div>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>Reminders</summary>
+        <div class="settings-section-body">
+          <div class="field-group" style="margin-bottom:0;">
+            <label>Notify near the end of a cycle</label>
+            <button type="button" class="btn-ghost" id="notif-toggle">ENABLE REMINDERS</button>
+            <div class="settings-hint" id="notif-status"></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="settings-section">
+        <summary>Backup</summary>
+        <div class="settings-section-body">
+          <div class="field-group" style="margin-bottom:0;">
+            <label>Your data never leaves this device — back it up yourself</label>
+            <div class="row">
+              <button type="button" class="btn-ghost" id="export-data">EXPORT DATA</button>
+              <button type="button" class="btn-ghost" id="import-data">IMPORT DATA</button>
+            </div>
+            <input type="file" id="import-file-input" accept="application/json" class="hidden">
           </div>
         </div>
       </details>

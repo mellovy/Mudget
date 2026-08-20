@@ -71,7 +71,8 @@ document.getElementById('ob-continue').addEventListener('click', () => {
     config: {
       amount, days, save,
       envelopes: defaultEnvelopes(amount, save),
-      accent: ACCENTS[0]
+      accent: ACCENTS[0],
+      recurring: []
     },
     cycleStart: Date.now(),
     logs: [],
@@ -104,7 +105,17 @@ function checkRollover(){
     if(state.history.length > 30) state.history.pop();
 
     state.cycleStart += cycleMs;
-    state.logs = [];
+    // seed the new cycle with recurring expenses (rent, subscriptions, etc)
+    // so they're accounted for from day one instead of being forgotten
+    const recurringLogs = (state.config.recurring||[]).map(r => ({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      amount: r.amount,
+      envelope: r.envelope || (state.config.envelopes[0]?.name || 'Buffer'),
+      note: r.name,
+      ts: state.cycleStart,
+      recurring: true
+    }));
+    state.logs = recurringLogs;
     state.lifetimeSaved += state.config.save; // new cycle's save target, banked immediately
     saveState(state);
     return checkRollover(); // in case multiple cycles passed while app was closed
@@ -173,6 +184,7 @@ function render(){
 
   renderEnvelopes();
   renderLog();
+  checkReminders();
 }
 
 function renderEnvelopes(){
@@ -199,32 +211,107 @@ function renderEnvelopes(){
   });
 }
 
+let logSearchQuery = '';
+
 function renderLog(){
   const wrap = document.getElementById('log-list');
   wrap.innerHTML = '';
+  const q = logSearchQuery.trim().toLowerCase();
+  const filtered = [...state.logs]
+    .filter(l => !q || (l.note||'').toLowerCase().includes(q) || l.envelope.toLowerCase().includes(q))
+    .sort((a,b)=>b.ts-a.ts);
+
   if(state.logs.length === 0){
     wrap.innerHTML = '<div class="log-empty">no spends logged this cycle yet</div>';
     return;
   }
-  [...state.logs].sort((a,b)=>b.ts-a.ts).forEach(log => {
+  if(filtered.length === 0){
+    wrap.innerHTML = '<div class="log-empty">no matches</div>';
+    return;
+  }
+  filtered.forEach(log => {
     const env = state.config.envelopes.find(e=>e.name===log.envelope);
+    const outer = document.createElement('div');
+    outer.className = 'log-item-wrap';
     const item = document.createElement('div');
-    item.className = 'log-item';
+    item.className = 'log-item' + (log.recurring ? ' recurring' : '');
     item.style.cursor = 'pointer';
     const d = new Date(log.ts);
     const timeStr = d.toLocaleDateString('en-PH', { month:'short', day:'numeric' }) + ' · ' +
                      d.toLocaleTimeString('en-PH', { hour:'numeric', minute:'2-digit' });
     item.innerHTML = `
       <div class="log-left">
-        <div class="log-note">${log.note || log.envelope}</div>
+        <div class="log-note">${log.note || log.envelope}${log.recurring ? ' <span class="settings-hint" style="display:inline">↻</span>' : ''}</div>
         <div class="log-meta"><span class="envelope-dot" style="display:inline-block;background:${env?env.color:'#666'}"></span> ${log.envelope} · ${timeStr}</div>
       </div>
       <div class="log-amount">${peso(log.amount)}</div>
     `;
-    item.addEventListener('click', () => openAddSheet(log));
-    wrap.appendChild(item);
+    item.addEventListener('click', () => {
+      if(item.dataset.swiped === '1') return; // ignore taps right after a swipe
+      openAddSheet(log);
+    });
+
+    const deleteBg = document.createElement('div');
+    deleteBg.className = 'log-item-delete-bg';
+    deleteBg.textContent = 'DELETE';
+
+    outer.appendChild(deleteBg);
+    outer.appendChild(item);
+    attachSwipeToDelete(item, log);
+    wrap.appendChild(outer);
   });
 }
+
+// swipe-left-to-delete for touch devices; tap still opens the edit sheet
+function attachSwipeToDelete(item, log){
+  let startX = 0, currentX = 0, dragging = false;
+  const threshold = -70;
+
+  item.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    dragging = true;
+    item.style.transition = 'none';
+  }, { passive:true });
+
+  item.addEventListener('touchmove', e => {
+    if(!dragging) return;
+    currentX = e.touches[0].clientX - startX;
+    if(currentX > 0) currentX = 0; // only allow swiping left
+    item.style.transform = `translateX(${currentX}px)`;
+  }, { passive:true });
+
+  item.addEventListener('touchend', () => {
+    dragging = false;
+    item.style.transition = 'transform 0.2s ease';
+    if(currentX < threshold){
+      item.dataset.swiped = '1';
+      item.style.transform = 'translateX(-100%)';
+      setTimeout(() => deleteLogWithUndo(log), 180);
+    } else {
+      item.style.transform = 'translateX(0)';
+      setTimeout(() => { item.dataset.swiped = '0'; }, 50);
+    }
+    currentX = 0;
+  });
+}
+
+function deleteLogWithUndo(log){
+  const removedIndex = state.logs.findIndex(l => l.id === log.id);
+  if(removedIndex === -1) return;
+  state.logs = state.logs.filter(l => l.id !== log.id);
+  saveState(state);
+  render();
+  showUndoToast('Entry deleted', () => {
+    state.logs.splice(Math.min(removedIndex, state.logs.length), 0, log);
+    saveState(state);
+    render();
+  });
+}
+
+document.getElementById('log-search').addEventListener('input', e => {
+  logSearchQuery = e.target.value;
+  renderLog();
+});
 
 // ---------- TABS ----------
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -373,6 +460,8 @@ function renderStats(){
     <div class="stat-card"><div class="stat-label">SAVE STREAK</div><div class="stat-value accent">${streak}</div></div>
   `;
 
+  renderCycleChart();
+
   const histWrap = document.getElementById('history-list');
   if(state.history.length === 0){
     histWrap.innerHTML = '<div class="log-empty">finish your first cycle to see history</div>';
@@ -395,11 +484,47 @@ function renderStats(){
   });
 }
 
+// bar chart of spend per cycle, oldest to newest, current cycle included on the right
+function renderCycleChart(){
+  const chart = document.getElementById('cycle-chart');
+  if(!chart) return;
+
+  const spendable = Math.max(state.config.amount - state.config.save, 1);
+  const pastCycles = [...state.history].slice(0, 7).reverse().map(h => ({
+    spent: h.spent,
+    label: new Date(h.start).toLocaleDateString('en-PH', { month:'short', day:'numeric' })
+  }));
+  const cycles = [...pastCycles, { spent: currentSpentTotal(), label: 'NOW' }];
+
+  if(cycles.length <= 1 && state.history.length === 0){
+    chart.innerHTML = '<div class="chart-empty">finish a few cycles to see the trend</div>';
+    return;
+  }
+
+  const maxSpent = Math.max(spendable, ...cycles.map(c=>c.spent), 1);
+  chart.innerHTML = '';
+  cycles.forEach(c => {
+    const heightPct = Math.max((c.spent / maxSpent) * 100, 2);
+    const over = c.spent > spendable;
+    const wrapEl = document.createElement('div');
+    wrapEl.className = 'chart-bar-wrap';
+    wrapEl.innerHTML = `
+      <div class="chart-bar ${over?'over':''}" style="height:${heightPct.toFixed(1)}%"></div>
+      <div class="chart-bar-label">${c.label}</div>
+    `;
+    chart.appendChild(wrapEl);
+  });
+}
+
 // ---------- ADD EXPENSE SHEET ----------
 let selectedEnvelope = null;
 let editingLogId = null;
 const addSheet = document.getElementById('add-sheet');
 const QUICK_AMOUNTS = [20, 50, 100, 150];
+
+// snapshot of the add-sheet fields when opened, so closing via the backdrop
+// can warn before silently discarding anything the person typed
+let addSheetOpenSnapshot = null;
 
 function openAddSheet(logToEdit){
   editingLogId = logToEdit ? logToEdit.id : null;
@@ -413,8 +538,24 @@ function openAddSheet(logToEdit){
   renderQuickAmounts();
   addSheet.classList.remove('hidden');
   setTimeout(()=>document.getElementById('add-amount').focus(), 100);
+  addSheetOpenSnapshot = {
+    amount: document.getElementById('add-amount').value,
+    note: document.getElementById('add-note').value,
+    envelope: selectedEnvelope
+  };
 }
-function closeAddSheet(){ addSheet.classList.add('hidden'); editingLogId = null; }
+function closeAddSheet(){ addSheet.classList.add('hidden'); editingLogId = null; addSheetOpenSnapshot = null; }
+
+function addSheetIsDirty(){
+  if(!addSheetOpenSnapshot) return false;
+  return document.getElementById('add-amount').value !== addSheetOpenSnapshot.amount
+    || document.getElementById('add-note').value !== addSheetOpenSnapshot.note
+    || selectedEnvelope !== addSheetOpenSnapshot.envelope;
+}
+function closeAddSheetWithConfirm(){
+  if(addSheetIsDirty() && !confirm('Discard this entry?')) return;
+  closeAddSheet();
+}
 
 // picks your 4 most-used spend amounts (across current + past cycles) so
 // the quick-chips actually reflect real habits instead of static guesses;
@@ -483,7 +624,7 @@ document.getElementById('add-note').addEventListener('keydown', e => {
 });
 
 document.getElementById('open-add').addEventListener('click', () => openAddSheet(null));
-document.getElementById('add-backdrop').addEventListener('click', closeAddSheet);
+document.getElementById('add-backdrop').addEventListener('click', closeAddSheetWithConfirm);
 
 document.getElementById('add-confirm').addEventListener('click', () => {
   const amountInput = document.getElementById('add-amount');
@@ -575,7 +716,9 @@ function openSettings(){
     envTotal: state.config.envelopes.reduce((s,e)=>s+e.amount,0)
   };
   renderEnvelopeEditList();
+  renderRecurringEditList();
   renderAccentPicker();
+  updateNotifStatus();
   settingsSheet.classList.remove('hidden');
 }
 
@@ -632,6 +775,32 @@ function renderEnvelopeEditList(){
   });
 }
 
+function renderRecurringEditList(){
+  const wrap = document.getElementById('recurring-edit-list');
+  wrap.innerHTML = '';
+  const envOptions = state.config.envelopes.map(e=>e.name);
+  (state.config.recurring||[]).forEach((rec, i) => {
+    const row = document.createElement('div');
+    row.className = 'recurring-edit-row';
+    const options = envOptions.map(name =>
+      `<option value="${name}" ${rec.envelope===name?'selected':''}>${name}</option>`
+    ).join('');
+    row.innerHTML = `
+      <input class="rec-name" data-i="${i}" value="${rec.name}" placeholder="e.g. Rent">
+      <select class="rec-env" data-i="${i}">${options}</select>
+      <input class="rec-amt" data-i="${i}" type="number" value="${rec.amount}">
+      <button data-i="${i}" class="rec-del">×</button>
+    `;
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('.rec-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.config.recurring.splice(parseInt(btn.dataset.i), 1);
+      renderRecurringEditList();
+    });
+  });
+}
+
 document.getElementById('open-settings').addEventListener('click', openSettings);
 document.getElementById('settings-backdrop').addEventListener('click', closeSettings);
 document.getElementById('settings-close').addEventListener('click', closeSettings);
@@ -645,6 +814,12 @@ document.getElementById('add-envelope-row').addEventListener('click', () => {
   const nextColor = ENV_COLORS[state.config.envelopes.length % ENV_COLORS.length];
   state.config.envelopes.push({ name:'New', amount:0, color: nextColor });
   renderEnvelopeEditList();
+});
+
+document.getElementById('add-recurring-row').addEventListener('click', () => {
+  if(!state.config.recurring) state.config.recurring = [];
+  state.config.recurring.push({ name:'New recurring', envelope: state.config.envelopes[0]?.name || 'Buffer', amount:0 });
+  renderRecurringEditList();
 });
 
 document.getElementById('settings-save').addEventListener('click', () => {
@@ -676,6 +851,11 @@ document.getElementById('settings-save').addEventListener('click', () => {
   state.config.days = newDays;
   state.config.save = newSave;
 
+  const recNames = [...document.querySelectorAll('.rec-name')].map(i=>i.value.trim() || 'Recurring');
+  const recEnvs = [...document.querySelectorAll('.rec-env')].map(i=>i.value);
+  const recAmts = [...document.querySelectorAll('.rec-amt')].map(i=>parseFloat(i.value)||0);
+  state.config.recurring = recNames.map((name,i)=>({ name, envelope: recEnvs[i], amount: recAmts[i] }));
+
   settingsOpenSnapshot = null;
   saveState(state);
   closeSettings();
@@ -690,7 +870,14 @@ document.getElementById('settings-reset').addEventListener('click', () => {
   state.lifetimeSaved += leftover;
   state.history.unshift({ start: state.cycleStart, spent, leftover: leftover + state.config.save, logs: state.logs });
   state.cycleStart = Date.now();
-  state.logs = [];
+  state.logs = (state.config.recurring||[]).map(r => ({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    amount: r.amount,
+    envelope: r.envelope || (state.config.envelopes[0]?.name || 'Buffer'),
+    note: r.name,
+    ts: state.cycleStart,
+    recurring: true
+  }));
   state.lifetimeSaved += state.config.save;
   saveState(state);
   closeSettings();
@@ -705,6 +892,117 @@ document.getElementById('settings-delete-all').addEventListener('click', () => {
   closeSettings();
   location.reload();
 });
+
+// ---------- BACKUP: EXPORT / IMPORT ----------
+document.getElementById('export-data').addEventListener('click', () => {
+  const dataStr = JSON.stringify(state, null, 2);
+  const blob = new Blob([dataStr], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `mudget-backup-${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('import-data').addEventListener('click', () => {
+  document.getElementById('import-file-input').click();
+});
+
+document.getElementById('import-file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const parsed = JSON.parse(reader.result);
+      if(!parsed || !parsed.config || !Array.isArray(parsed.logs)){
+        alert('That file doesn\'t look like a valid Mudget backup.');
+        return;
+      }
+      if(!confirm('Import this backup? It will replace all current data on this device.')) return;
+      state = parsed;
+      saveState(state);
+      closeSettings();
+      boot();
+    }catch(err){
+      alert('Could not read that file — make sure it\'s a Mudget backup JSON.');
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+// ---------- REMINDERS (LOCAL NOTIFICATIONS) ----------
+function updateNotifStatus(){
+  const btn = document.getElementById('notif-toggle');
+  const statusEl = document.getElementById('notif-status');
+  if(!('Notification' in window)){
+    btn.classList.add('hidden');
+    statusEl.textContent = 'Notifications aren\'t supported on this device/browser.';
+    return;
+  }
+  const perm = Notification.permission;
+  const enabled = state.config.remindersEnabled && perm === 'granted';
+  btn.textContent = enabled ? 'REMINDERS ON' : 'ENABLE REMINDERS';
+  if(perm === 'denied'){
+    statusEl.textContent = 'Notifications are blocked for this site in your browser settings.';
+  } else if(enabled){
+    statusEl.textContent = 'You\'ll get a nudge when your cycle is almost up or you\'re over budget.';
+  } else {
+    statusEl.textContent = 'Get a reminder near the end of a cycle, and a heads-up if you go over budget.';
+  }
+}
+
+document.getElementById('notif-toggle').addEventListener('click', async () => {
+  if(!('Notification' in window)) return;
+  if(state.config.remindersEnabled){
+    state.config.remindersEnabled = false;
+    saveState(state);
+    updateNotifStatus();
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if(perm === 'granted'){
+    state.config.remindersEnabled = true;
+    saveState(state);
+  }
+  updateNotifStatus();
+});
+
+// fires at most once per cycle for the "almost out of time" nudge, and once
+// per cycle for the "over budget" nudge, tracked via cycleStart timestamps
+// so re-renders and reboots don't spam duplicate notifications
+function checkReminders(){
+  if(!state.config.remindersEnabled) return;
+  if(!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  if(!state.notified) state.notified = {};
+
+  const { config } = state;
+  const elapsed = Date.now() - state.cycleStart;
+  const cycleMs = config.days * dayMs();
+  const hoursLeft = (cycleMs - elapsed) / (60*60*1000);
+  const spent = currentSpentTotal();
+  const spendable = config.amount - config.save;
+  const remaining = spendable - spent;
+
+  const cycleKey = String(state.cycleStart);
+
+  if(hoursLeft <= 24 && hoursLeft > 0 && state.notified.lowTime !== cycleKey){
+    new Notification('Cycle ending soon', { body: `Less than a day left — ${peso(remaining)} remaining.` });
+    state.notified.lowTime = cycleKey;
+    saveState(state);
+  }
+  if(remaining < 0 && state.notified.overBudget !== cycleKey){
+    new Notification('Over budget', { body: `You're ${peso(Math.abs(remaining))} over for this cycle.` });
+    state.notified.overBudget = cycleKey;
+    saveState(state);
+  }
+}
 
 // ---------- BOOT ----------
 function boot(){
@@ -723,6 +1021,7 @@ function boot(){
   if(state.config.envelopes.some(e=>!e.color)){
     state.config.envelopes.forEach((e,i)=>{ if(!e.color) e.color = ENV_COLORS[i % ENV_COLORS.length]; });
   }
+  if(!state.config.recurring) state.config.recurring = [];
   applyAccent(state.config.accent);
   applyTheme(state.config.theme || 'dark');
   onboardingEl.classList.add('hidden');
